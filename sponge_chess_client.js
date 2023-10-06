@@ -1,9 +1,22 @@
 (() => {
   // =========================================================
-  //   SPONGE CHESS CLIENT v2.0-beta
+  //   SPONGE CHESS CLIENT v2.1-beta
   // 	 CHESSBOARD VERSION: 1.56.0
   // =========================================================
 
+  // OPTIONS
+  const ELO = 1600
+  const DEPTH = 4
+  const minDelay = 600; // the normal minimum delay 
+  const maxDelay = 1500;
+  const openingMovesDelayFactor = 3 // the speed at which the "opening moves" should be. This is the first 5 - 10 moves. Higher value = faster
+  const rushDelayMin = 50 // the min milliseconds delay when "rush mode" is active
+  const rushDelayMax = 250 // the max milliseconds delay when "rush mode" is active
+  const rushModeMaxSeconds = 11 // "rush mode" will start when your clock hits this value in seconds left 
+
+  //
+  // ========== DO NOT MODIFY BELOW THIS
+  //
   const manageSocketResource = (board, socket) => {
     const interval = setInterval(() => {
       if (board.game.isGameOver()) {
@@ -133,8 +146,6 @@
       }
       const timeLeft = getTimeLeft();
       const piecesCount = getPiecesLeft()
-      const minDelay = 500;
-      const maxDelay = (piecesCount * 40) + 650;
 
       const randomDelay = Math.random() * (maxDelay - minDelay) + minDelay;
       spongePrint(`Delay: ${randomDelay} (${minDelay} - ${maxDelay})`)
@@ -144,12 +155,17 @@
       if (timeLeft.minutes === 0 && timeLeft.seconds < 10) {
         // HURRY UP!
         spongePrint("RUSH MODE! LESS THAN 10 SECONDS LEFT")
-        await delay(Math.random() * (450 - 120) + 120)
+        await delay(Math.random() * (rushDelayMax - rushDelayMin) + rushDelayMin)
       } else if (board.game.getHistoryFENs().length < 20) {
         // book moves
         spongePrint("Delay shortened for book moves")
-        await delay(randomDelay / 2)
+        await delay(randomDelay / openingMovesDelayFactor)
       } else await delay(randomDelay);
+      
+      originalMoveFunction(moveOptions);
+      
+      // ensure a promotion runs if needed
+      moveOptions.promotion = "n";
       originalMoveFunction(moveOptions);
     });
     const handleResponseDefault = (response) => {
@@ -190,9 +206,6 @@
     // SOCKET HANDLERS
 
     socket.onopen = (event) => {
-      const ELO = 1500
-      const DEPTH = 5
-
       spongePrint(`Connected to SpongeChess socket server: ${event.data}`);
       sendCommand(`get_best_moves:${board.game.getFEN()}`);
       sendCommand(`set_depth:${DEPTH}`)
