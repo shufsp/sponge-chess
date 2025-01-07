@@ -31,7 +31,7 @@ def display_stats():
     print(f"FEN: {stockfish.get_fen_position()}")
     print()
 
-async def websocket_handler(websocket, path):
+async def websocket_handler(websocket):
     print("New client connection")
     await websocket.send("WebSocket connection established")
 
@@ -59,11 +59,11 @@ async def websocket_handler(websocket, path):
     except websockets.exceptions.ConnectionClosed:
         print("WebSocket connection closed")
 
+async def main(port: int):
+    async with websockets.serve(websocket_handler, "localhost", port) as server:
+        print(f"SpongeChess socket server running on port {port}")
+        print(f"get_best_moves, apply_preset:<preset>, set_elo:<ELO>, set_depth:<DEPTH>")
+        await server.serve_forever()
 
 if __name__ == "__main__":
-    PORT = 8765
-    start_server = websockets.serve(websocket_handler, "0.0.0.0", PORT)
-    print(f"SpongeChess socket server running on port {PORT}")
-    print(f"get_best_moves, apply_preset:<preset>, set_elo:<ELO>, set_depth:<DEPTH>")
-    asyncio.get_event_loop().run_until_complete(start_server)
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(main(port=8765))
