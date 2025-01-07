@@ -5,8 +5,8 @@
   // =========================================================
 
   // OPTIONS
-  const ELO = 1600
-  const DEPTH = 4
+  let ELO = 2500
+  let DEPTH = 4
   const minDelay = 600; // the normal minimum delay 
   const maxDelay = 1500;
   const openingMovesDelayFactor = 3 // the speed at which the "opening moves" should be. This is the first 5 - 10 moves. Higher value = faster
@@ -14,9 +14,17 @@
   const rushDelayMax = 250 // the max milliseconds delay when "rush mode" is active
   const rushModeMaxSeconds = 11 // "rush mode" will start when your clock hits this value in seconds left 
 
+  // MANUAL MODE. WARNING: overrides most the above settings
+  const keypressKey = ','
+  const keypressEnabled = true
+
+  const depthAdjustUpKey = "p"
+  const depthAdjustDownKey = "o"
+
   //
   // ========== DO NOT MODIFY BELOW THIS
   //
+
   const manageSocketResource = (board, socket) => {
     const interval = setInterval(() => {
       if (board.game.isGameOver()) {
@@ -147,26 +155,42 @@
       const timeLeft = getTimeLeft();
       const piecesCount = getPiecesLeft()
 
-      const randomDelay = Math.random() * (maxDelay - minDelay) + minDelay;
-      spongePrint(`Delay: ${randomDelay} (${minDelay} - ${maxDelay})`)
+      const doSpongeMove = () => {
+        originalMoveFunction(moveOptions);
 
-      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        // ensure a promotion runs if needed
+        moveOptions.promotion = "n";
+        originalMoveFunction(moveOptions);
+      }
 
-      if (timeLeft.minutes === 0 && timeLeft.seconds < 10) {
-        // HURRY UP!
-        spongePrint("RUSH MODE! LESS THAN 10 SECONDS LEFT")
-        await delay(Math.random() * (rushDelayMax - rushDelayMin) + rushDelayMin)
-      } else if (board.game.getHistoryFENs().length < 20) {
-        // book moves
-        spongePrint("Delay shortened for book moves")
-        await delay(randomDelay / openingMovesDelayFactor)
-      } else await delay(randomDelay);
-      
-      originalMoveFunction(moveOptions);
-      
-      // ensure a promotion runs if needed
-      moveOptions.promotion = "n";
-      originalMoveFunction(moveOptions);
+      if (!keypressEnabled) {
+        const randomDelay = Math.random() * (maxDelay - minDelay) + minDelay;
+        spongePrint(`Delay: ${randomDelay} (${minDelay} - ${maxDelay})`)
+
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        if (timeLeft.minutes === 0 && timeLeft.seconds < 10) {
+          // HURRY UP!
+          spongePrint("RUSH MODE! LESS THAN 10 SECONDS LEFT")
+          await delay(Math.random() * (rushDelayMax - rushDelayMin) + rushDelayMin)
+        } else if (board.game.getHistoryFENs().length < 20) {
+          // book moves
+          spongePrint("Delay shortened for book moves")
+          await delay(randomDelay / openingMovesDelayFactor)
+        } else await delay(randomDelay);
+        doSpongeMove();
+      } else {
+        function handleKeyPress(event, callback) {
+          if (event.key === keypressKey) {
+            spongePrint(`Manual moved`)
+            callback()
+            document.removeEventListener('keypress', handleKeyPress);
+          }
+        }
+        document.addEventListener('keypress', (e) => handleKeyPress(e, doSpongeMove));
+        spongePrint(`Waiting for manual move (keypressKey: '${keypressKey}')`)
+      }
+
     });
     const handleResponseDefault = (response) => {
       spongePrint(`Default response handler ran (${response})`)
@@ -202,6 +226,17 @@
       })
     }
 
+    function handleDepth(event) {
+      const adjustedUp = event.key === depthAdjustUpKey;
+      const adjustedDown = event.key === depthAdjustDownKey;
+      if (!adjustedUp && !adjustedDown) return;
+
+      const delta = adjustedUp ? +1 : -1;
+      DEPTH = DEPTH + delta;
+      sendCommand(`set_depth:${DEPTH}`)
+      console.log(`Depth: ${DEPTH}`)
+    }
+    document.addEventListener('keydown', handleDepth);
 
     // SOCKET HANDLERS
 
